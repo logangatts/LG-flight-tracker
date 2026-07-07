@@ -18,11 +18,13 @@ namespace websrv {
 
 // Web palette (themed per flavor at compile time).
 #ifdef SWA_THEME
-#define W_BG "#070B1E"
-#define W_CARD "#0C1230"
-#define W_FLD "#131C44"
-#define W_TXT "#E8EAF2"
-#define W_DIM "#9AA1B8"
+// Strict corporate palette: Bold Blue, Warm Red, Sunrise Yellow, Summit
+// Silver + neutral black/white only. Structure comes from blue borders.
+#define W_BG "#000000"
+#define W_CARD "#000000"
+#define W_FLD "#000000"
+#define W_TXT "#FFFFFF"
+#define W_DIM "#CCCCCC"
 #define W_BRD "#304CB2"
 #define W_ACC "#FFBF27"
 #define W_DGB "#D5152E"
