@@ -942,6 +942,27 @@ void radarDrawCb(lv_event_t* e) {
   // Center dot ("you are here").
   drawCircle(layer, kCx, kCy, 3, kColSweep, 3, LV_OPA_COVER);
 
+  // Ring distance callouts along the NE diagonal (radar convention; dodges
+  // the status text at top and range label at bottom). Unit on the outer
+  // ring only; rings sit at 1/3, 2/3 and full radius of the current range.
+  {
+    float rMi = gApp.radiusMi();
+    const float kDiag = 0.7071f;  // sin/cos 45 deg
+    for (int ring = 1; ring <= 3; ring++) {
+      float frac = ring / 3.0f;
+      float d = rMi * frac;
+      char txt[12];
+      if (ring == 3) {
+        snprintf(txt, sizeof(txt), d < 9.95f ? "%.1f mi" : "%.0f mi", d);
+      } else {
+        snprintf(txt, sizeof(txt), d < 9.95f ? "%.1f" : "%.0f", d);
+      }
+      float rr = cfg::kScreenR * frac - 12;  // just inside the ring
+      drawText(layer, txt, kCx + rr * kDiag, kCy - rr * kDiag - 6, fSm(),
+               kColTextDim, map ? LV_OPA_70 : LV_OPA_90);
+    }
+  }
+
   // Airport callouts, revealed by zoom: majors always; regionals from 15 mi
   // (codes at 7); small/GA fields from 7 mi (codes at 3).
   {
