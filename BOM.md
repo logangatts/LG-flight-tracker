@@ -16,6 +16,7 @@
 | Button | 7mm flush momentary, black | ~$1 | [Amazon search](https://www.amazon.com/s?k=7mm+momentary+push+button+switch+flush+black) | Adafruit's 16mm units too bulky; black OOS there |
 | USB-C extension | Small round panel-mount USB-C M-F | $4.95 | **Adafruit** [#6069](https://www.adafruit.com/product/6069) ✓ in stock (alt: [#4218](https://www.adafruit.com/product/4218)) | Routes board's port to the rear cutout |
 | Battery pigtails | JST-PH 2-pin cable (+ MX1.25 pigtails for mini) | $0.75 + ~$1 | **Adafruit** [#261](https://www.adafruit.com/product/261) ✓ in stock · [MX1.25: Amazon search](https://www.amazon.com/s?k=mx1.25+2+pin+cable+battery) | |
+| Zoom dial ("crown") | EC11-class rotary encoder, 24 detents, push switch, threaded panel-mount bushing | $4.50 | **Adafruit** [#377](https://www.adafruit.com/product/377) ✓ in stock · spares: [EC11 10-pack, Amazon](https://www.amazon.com/s?k=ec11+rotary+encoder+switch+d+shaft) · production: Bourns PEC11R (Mouser, ~$1.20 @ qty) | Panel-mounts through the shell wall with its own nut; 3 GPIO + GND. Rotate = zoom, press = deselect |
 | Light pipe | 2mm clear acrylic rod, cut to length | ~$0.20 | [Amazon search](https://www.amazon.com/s?k=2mm+clear+acrylic+rod) | Same stock, different lengths |
 | Fasteners | M3 brass heat-set inserts (4.0mm pilot) + M3×8 screws | ~$1 | [Amazon search](https://www.amazon.com/s?k=m3+brass+heat+set+inserts+3d+printing) | Adafruit #4255 exists but out of stock |
 | Ballast | ⅜" steel flat washers, stacked in base pocket | ~$1.50–2.50 | Local hardware store | Mini ~70g (5), large ~120g (9) |
@@ -53,13 +54,24 @@ Both enclosures come from the same parametric model (OpenSCAD, size parameter) �
 
 | Part | Material | Shared? |
 |---|---|---|
-| 1. Main shell (wedge, ~55° face) | PETG/ASA | Same model, scaled: mini ~Ø84×72mm, large ~Ø128×102mm |
+| 1. Main shell (wedge, ~55° face, **crown boss at 2 o'clock**) | PETG/ASA | Same model, scaled: mini ~Ø84×72mm, large ~Ø128×102mm |
 | 2. Base plate (washer pocket, insert bosses, vent slots) | PETG/ASA | Same model, scaled |
 | 3. Snap-on bezel ring (hides seam + screen adhesive) | PETG/ASA | Same profile, sized to each panel |
 | 4. Button cap | PETG/ASA | **Identical STL both SKUs** |
-| 5. Foot ring | TPU | Same profile, scaled diameter |
+| 5. Crown knob cap (D-shaft bore, knurled rim) | PETG/ASA | **Identical STL both SKUs** |
+| 6. Foot ring | TPU | Same profile, scaled diameter |
 
-Identical across both: wall spec (2.4mm), M3 insert bosses, USB-C rear cutout template (+0.5mm clearance, chamfered), light-pipe bore (2.1mm), button hole, print orientation (shell face-down on textured plate).
+Identical across both: wall spec (2.4mm), M3 insert bosses, USB-C rear cutout template (+0.5mm clearance, chamfered), light-pipe bore (2.1mm), button hole, crown mount, print orientation (shell face-down on textured plate).
+
+**Crown mount spec (both shells):** local boss at the 2-o'clock position of the
+bezel, wall thinned to 2.0mm across the boss face (EC11 bushings are ~5–7mm —
+the nut needs thread engagement), 7.2mm through-hole + anti-rotation flat,
+nut seats on the inside face. Knob cap: 6.0mm D-bore (flat 4.5mm), ~14mm dia
+knurled. Wiring: encoder A/B/switch + GND.
+- **Large (P4-4C):** wire to the 40-pin header — GPIO confirmed available.
+- **Mini (2.8C):** spare-GPIO situation unverified; if the board exposes
+  fewer than 3 usable pins the mini ships touch-only and the boss stays
+  unpopulated (cap the hole with the printed plug). Verify on arrival.
 
 Print estimates per unit: mini ~60g / ~5h; large ~140g / ~11h (0.4mm nozzle, 0.2mm layers).
 
@@ -70,9 +82,9 @@ Print estimates per unit: mini ~60g / ~5h; large ~140g / ~11h (0.4mm nozzle, 0.2
 | | Mini | Large |
 |---|---|---|
 | Electronics | ~$31 | ~$90 |
-| Shared hardware | ~$20 | ~$20 |
+| Shared hardware (incl. crown encoder) | ~$25 | ~$25 |
 | Filament | ~$2 | ~$4 |
-| **Parts total** | **~$53** | **~$114** |
+| **Parts total** | **~$58** | **~$119** |
 | Plausible price | $99 | $179–199 |
 
 *(Prototype totals using the $6 Adafruit soft-latch module; the DIY MOSFET latch saves ~$5/unit at volume.)*
