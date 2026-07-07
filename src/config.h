@@ -65,6 +65,14 @@ inline constexpr const char* kAeroApi =
     "https://aeroapi.flightaware.com/aeroapi/flights/%s?max_pages=1";
 inline constexpr uint32_t kAeroMonthlyCap = 900;  // stay inside $5 free credit
 inline constexpr uint16_t kAeroTtlDays = 3;       // filed legs change daily
+
+// Optional user-supplied AirLabs key: an alternative schedule-data source
+// (like adsbdb, but a maintained paid dataset) — tried when AeroAPI is
+// absent or also misses. Uses flight_icao so no IATA conversion is needed.
+inline constexpr const char* kAirlabsApi =
+    "https://airlabs.co/api/v9/routes?flight_icao=%s&api_key=%s";
+inline constexpr uint32_t kAirlabsMonthlyCap = 900;  // conservative — verify your plan's limit
+inline constexpr uint16_t kAirlabsTtlDays = 14;      // schedule data drifts slower than filed plans
 inline constexpr const char* kAircraftApi = "https://api.adsbdb.com/v0/aircraft/";
 // Airline logos, vector-rendered server-side at the requested pixel size.
 inline constexpr const char* kLogoApi = "https://pics.avs.io/220/80/%s.png";

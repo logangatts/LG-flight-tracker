@@ -62,10 +62,12 @@ bool routePlausible(const char* callsign, const RouteInfo& info) {
 // reboots. The device gets MORE reliable over time — daily regulars resolve
 // instantly and offline. Entries age out after kRouteTtlDays so seasonal
 // schedule changes still refresh.
+enum : uint8_t { kSrcDb = 0, kSrcAero = 1, kSrcAirlabs = 2 };
+
 struct CacheEntry {
   char callsign[10];
   bool found;
-  uint8_t srcAero;    // 1 = filed plan from AeroAPI (short TTL — legs change)
+  uint8_t srcKind;    // kSrcDb/kSrcAero/kSrcAirlabs — sets the TTL below
   uint16_t epochDay;  // day the route was fetched (0 = unknown clock)
   RouteInfo info;
 };
@@ -76,18 +78,30 @@ uint16_t s_cacheNext = 0;        // round-robin eviction
 uint32_t s_fileRecords = 0;
 bool s_fsOk = false;
 
-constexpr uint32_t kFileMagic = 0x46525432;  // "FRT2" (struct gained srcAero)
+constexpr uint32_t kFileMagic = 0x46525433;  // "FRT3" (srcAero -> srcKind)
 
-// ---- optional AeroAPI (user key) ----
+// ---- optional enhanced route sources (user-supplied keys) ----
 char s_aeroKey[72] = {0};
 uint16_t s_aeroMonth = 0;
 uint32_t s_aeroCount = 0;
+
+char s_airlabsKey[48] = {0};
+uint16_t s_airlabsMonth = 0;
+uint32_t s_airlabsCount = 0;
 
 void aeroSaveCounters() {
   Preferences p;
   p.begin("keys", false);
   p.putUShort("aeroM", s_aeroMonth);
   p.putUInt("aeroC", s_aeroCount);
+  p.end();
+}
+
+void airlabsSaveCounters() {
+  Preferences p;
+  p.begin("keys", false);
+  p.putUShort("alM", s_airlabsMonth);
+  p.putUInt("alC", s_airlabsCount);
   p.end();
 }
 
@@ -200,6 +214,16 @@ bool aeroBudgetOk() {
   return s_aeroCount < cfg::kAeroMonthlyCap;
 }
 
+bool airlabsBudgetOk() {
+  uint16_t m = todayEpochDay() / 30;
+  if (m && m != s_airlabsMonth) {
+    s_airlabsMonth = m;
+    s_airlabsCount = 0;
+    airlabsSaveCounters();
+  }
+  return s_airlabsCount < cfg::kAirlabsMonthlyCap;
+}
+
 // Query AeroAPI for the callsign's filed flights and pick the active leg.
 bool tryAeroApi(const char* cs, RouteInfo* out) {
   if (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) < 50 * 1024)
@@ -262,20 +286,90 @@ bool tryAeroApi(const char* cs, RouteInfo* out) {
   return true;
 }
 
-// After the free DB comes up empty/wrong: try the user's AeroAPI key.
-bool tryAeroFallback(const char* cs) {
-  if (!s_aeroKey[0] || !aeroBudgetOk()) return false;
-  RouteInfo info;
-  if (!tryAeroApi(cs, &info)) return false;
-  CacheEntry* e = cachePut(cs, true, &info, todayEpochDay());
-  if (e) {
-    e->srcAero = 1;
-    persistAppend(*e);
+// Query AirLabs (schedule-data source, like adsbdb but a maintained paid
+// dataset) via flight_icao — no IATA conversion needed for the callsign.
+bool tryAirlabsApi(const char* cs, RouteInfo* out) {
+  if (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) < 50 * 1024)
+    return false;
+
+  char url[160];
+  snprintf(url, sizeof(url), cfg::kAirlabsApi, cs, s_airlabsKey);
+  WiFiClientSecure client;
+  client.setInsecure();
+  HTTPClient http;
+  http.setUserAgent(cfg::kUserAgent);
+  http.setTimeout(cfg::kHttpTimeoutMs);
+  if (!http.begin(client, url)) return false;
+  int code = http.GET();
+  if (code != 200) {
+    Serial.printf("[route] airlabs %s HTTP %d\n", cs, code);
+    http.end();
+    return false;
   }
-  gAircraft.setRouteFound(cs, info);
-  Serial.printf("[route] %s: %s -> %s (AeroAPI filed plan)\n", cs,
-                info.origIata, info.destIata);
+
+  JsonDocument filter;
+  JsonObject rf = filter["response"].add<JsonObject>();
+  rf["dep_iata"] = true;
+  rf["arr_iata"] = true;
+  rf["airline_iata"] = true;
+
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(
+      doc, http.getString(), DeserializationOption::Filter(filter));
+  http.end();
+  if (err) return false;
+
+  // A wrong/expired key returns a JSON {"error":...} body, not an HTTP
+  // error — treat any "error" object as a failed call, uncounted.
+  if (!doc["error"].isNull()) {
+    Serial.printf("[route] airlabs %s: %s\n", cs,
+                  (const char*)(doc["error"]["message"] | "error"));
+    return false;
+  }
+  s_airlabsCount++;  // only count calls that actually returned data
+  airlabsSaveCounters();
+
+  JsonObject pick = doc["response"][0];
+  if (pick.isNull()) return false;
+
+  memset(out, 0, sizeof(*out));
+  strlcpy(out->origIata, pick["dep_iata"] | "?", sizeof(out->origIata));
+  strlcpy(out->destIata, pick["arr_iata"] | "?", sizeof(out->destIata));
+  if (out->origIata[0] == '?' || out->destIata[0] == '?') return false;
+  strlcpy(out->airlineIata, pick["airline_iata"] | "", sizeof(out->airlineIata));
+  airportCoords(out->origIata, &out->origLat, &out->origLon);
+  airportCoords(out->destIata, &out->destLat, &out->destLon);
   return true;
+}
+
+// After the free DB comes up empty/wrong: try enhanced sources in order
+// (AeroAPI's filed plans first — best for multi-leg through-flights — then
+// AirLabs). Either, both, or neither may be configured.
+bool tryEnhancedFallback(const char* cs) {
+  RouteInfo info;
+  if (s_aeroKey[0] && aeroBudgetOk() && tryAeroApi(cs, &info)) {
+    CacheEntry* e = cachePut(cs, true, &info, todayEpochDay());
+    if (e) {
+      e->srcKind = kSrcAero;
+      persistAppend(*e);
+    }
+    gAircraft.setRouteFound(cs, info);
+    Serial.printf("[route] %s: %s -> %s (AeroAPI filed plan)\n", cs,
+                  info.origIata, info.destIata);
+    return true;
+  }
+  if (s_airlabsKey[0] && airlabsBudgetOk() && tryAirlabsApi(cs, &info)) {
+    CacheEntry* e = cachePut(cs, true, &info, todayEpochDay());
+    if (e) {
+      e->srcKind = kSrcAirlabs;
+      persistAppend(*e);
+    }
+    gAircraft.setRouteFound(cs, info);
+    Serial.printf("[route] %s: %s -> %s (AirLabs)\n", cs, info.origIata,
+                  info.destIata);
+    return true;
+  }
+  return false;
 }
 
 void transientFailure(const char* cs, const char* why, int code) {
@@ -297,6 +391,16 @@ void setAeroKey(const char* key) {
 bool aeroActive() { return s_aeroKey[0] != 0; }
 uint32_t aeroUsedThisMonth() { return s_aeroCount; }
 
+void setAirlabsKey(const char* key) {
+  strlcpy(s_airlabsKey, key ? key : "", sizeof(s_airlabsKey));
+  Preferences p;
+  p.begin("keys", false);
+  p.putString("airlabs", s_airlabsKey);
+  p.end();
+}
+bool airlabsActive() { return s_airlabsKey[0] != 0; }
+uint32_t airlabsUsedThisMonth() { return s_airlabsCount; }
+
 void loadPersist() {
   {
     Preferences p;
@@ -304,8 +408,13 @@ void loadPersist() {
     strlcpy(s_aeroKey, p.getString("aero", "").c_str(), sizeof(s_aeroKey));
     s_aeroMonth = p.getUShort("aeroM", 0);
     s_aeroCount = p.getUInt("aeroC", 0);
+    strlcpy(s_airlabsKey, p.getString("airlabs", "").c_str(),
+            sizeof(s_airlabsKey));
+    s_airlabsMonth = p.getUShort("alM", 0);
+    s_airlabsCount = p.getUInt("alC", 0);
     p.end();
     if (s_aeroKey[0]) Serial.println("[route] AeroAPI key configured");
+    if (s_airlabsKey[0]) Serial.println("[route] AirLabs key configured");
   }
   s_fsOk = LittleFS.begin(true /* format on first use */);
   if (!s_fsOk) {
@@ -347,7 +456,9 @@ void serviceOne() {
   // Cache hit — no network needed (unless the entry aged out).
   if (CacheEntry* e = cacheFind(cs)) {
     uint16_t today = todayEpochDay();
-    uint16_t ttl = e->srcAero ? cfg::kAeroTtlDays : cfg::kRouteTtlDays;
+    uint16_t ttl = e->srcKind == kSrcAero      ? cfg::kAeroTtlDays
+                   : e->srcKind == kSrcAirlabs ? cfg::kAirlabsTtlDays
+                                               : cfg::kRouteTtlDays;
     bool stale = e->found && e->epochDay && today &&
                  (uint16_t)(today - e->epochDay) > ttl;
     if (!stale) {
@@ -389,7 +500,7 @@ void serviceOne() {
     // Not in the community DB. AeroAPI (if configured) may still have the
     // filed plan; otherwise cache the miss (RAM only — re-checks on reboot).
     s_http->end();  // with setReuse, keeps the socket for the next lookup
-    if (tryAeroFallback(cs)) return;
+    if (tryEnhancedFallback(cs)) return;
     cachePut(cs, false, nullptr, todayEpochDay());
     gAircraft.setRouteNone(cs);
     return;
@@ -410,7 +521,7 @@ void serviceOne() {
 
   JsonObject fr = doc["response"]["flightroute"];
   if (fr.isNull()) {
-    if (tryAeroFallback(cs)) return;
+    if (tryEnhancedFallback(cs)) return;
     cachePut(cs, false, nullptr, todayEpochDay());
     gAircraft.setRouteNone(cs);
     return;
@@ -431,7 +542,7 @@ void serviceOne() {
   if (!routePlausible(cs, info)) {
     // Stale DB entry. The filed plan (AeroAPI) knows the real leg — this is
     // exactly where it shines (multi-leg Southwest through-flights).
-    if (tryAeroFallback(cs)) return;
+    if (tryEnhancedFallback(cs)) return;
     cachePut(cs, false, nullptr, todayEpochDay());
     gAircraft.setRouteNone(cs);
     return;

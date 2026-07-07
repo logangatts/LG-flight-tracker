@@ -684,10 +684,18 @@ void refreshSettingsLabels() {
                                               : 0;
   lv_label_set_text_fmt(s_setUnitLbl, "Units: %s", kUnitNames[preset]);
   lv_label_set_text(s_setWifiLbl, "Reset WiFi");
-  char routeLine[48];
-  if (routes::aeroActive()) {
+  char routeLine[64];
+  bool aero = routes::aeroActive(), airlabs = routes::airlabsActive();
+  if (aero && airlabs) {
+    snprintf(routeLine, sizeof(routeLine), "routes: AeroAPI+AirLabs (%lu+%lu/mo)",
+             (unsigned long)routes::aeroUsedThisMonth(),
+             (unsigned long)routes::airlabsUsedThisMonth());
+  } else if (aero) {
     snprintf(routeLine, sizeof(routeLine), "routes: FlightAware (%lu/mo)",
              (unsigned long)routes::aeroUsedThisMonth());
+  } else if (airlabs) {
+    snprintf(routeLine, sizeof(routeLine), "routes: AirLabs (%lu/mo)",
+             (unsigned long)routes::airlabsUsedThisMonth());
   } else {
     snprintf(routeLine, sizeof(routeLine), "routes: basic — upgrade on web");
   }

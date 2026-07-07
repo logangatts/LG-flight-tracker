@@ -17,4 +17,10 @@ void setAeroKey(const char* key);  // "" disables
 bool aeroActive();
 uint32_t aeroUsedThisMonth();
 
+// Optional AirLabs key — alternative/additional enhanced source, tried
+// after AeroAPI (if both are configured).
+void setAirlabsKey(const char* key);
+bool airlabsActive();
+uint32_t airlabsUsedThisMonth();
+
 }  // namespace routes

@@ -292,33 +292,67 @@ String page(const char* notice = nullptr) {
          "within ~30 s.</small></div>");
 
   // ---- Route data ----
+  // Two independent optional enhanced sources — either, both, or neither.
+  // adsbdb (free) is always tried first; AeroAPI's filed plans are tried
+  // before AirLabs when both are configured (best for through-flights).
+  bool anyEnhanced = routes::aeroActive() || routes::airlabsActive();
   h += F("<h2>Route data</h2><div class=card>");
+  snprintf(buf, sizeof(buf), "<b>%s</b> &bull; free community database%s",
+           anyEnhanced ? "Enhanced" : "Basic",
+           anyEnhanced ? " (always tried first)" : "");
+  h += buf;
+  if (!anyEnhanced) {
+    h += F(
+        "<br><small>Some routes are missing or hidden as unreliable "
+        "&mdash; especially multi-leg airlines like Southwest, where one "
+        "flight number covers several city pairs per day.</small>");
+  }
+  h += F("<br><br>");
+
+  // -- FlightAware AeroAPI --
   if (routes::aeroActive()) {
     snprintf(buf, sizeof(buf),
-             "<b>Enhanced</b> &bull; FlightAware AeroAPI active &bull; "
-             "%lu of %lu lookups used this month<br>"
-             "<small>Missing routes are filled from real filed flight "
-             "plans.</small>"
-             "<form method=post action=/set class=row><button name=aeroclr value=1 "
-             "class=danger>Remove key</button></form>",
+             "<b>FlightAware AeroAPI:</b> active &bull; %lu of %lu lookups "
+             "this month<br><small>Fills gaps with real filed flight "
+             "plans &mdash; the correct leg for Southwest through-flights.</small>"
+             "<form method=post action=/set class=row><button name=aeroclr "
+             "value=1 class=danger>Remove key</button></form>",
              (unsigned long)routes::aeroUsedThisMonth(),
              (unsigned long)cfg::kAeroMonthlyCap);
     h += buf;
   } else {
     h += F(
-        "<b>Basic</b> &bull; free community database<br>"
-        "<small>Some routes are missing or hidden as unreliable &mdash; "
-        "especially multi-leg airlines like Southwest, where one flight "
-        "number covers several city pairs per day.</small><br><br>"
-        "<b>Free upgrade:</b> a FlightAware AeroAPI key fills the gaps with "
-        "real filed flight plans &mdash; the correct leg for Southwest "
-        "through-flights, plus charters and internationals. The personal "
-        "tier includes $5/month of credit; on-device caching keeps typical "
-        "home use inside it, and a built-in monthly cap prevents overage."
-        "<br><small>Create a free account and key at "
-        "<b>flightaware.com/aeroapi</b>, then paste it here:</small>"
-        "<form method=post action=/set class=row><input name=aerokey size=30 "
-        "placeholder='AeroAPI key'><button>Save</button></form>");
+        "<b>FlightAware AeroAPI</b> (free upgrade): real filed flight "
+        "plans. The personal tier includes $5/month of credit; on-device "
+        "caching keeps typical home use inside it, with a built-in monthly "
+        "cap to prevent overage.<br><small>Free account &amp; key at "
+        "<b>flightaware.com/aeroapi</b>:</small>"
+        "<form method=post action=/set class=row><input name=aerokey "
+        "size=28 placeholder='AeroAPI key'><button>Save</button></form>");
+  }
+  h += F("<br>");
+
+  // -- AirLabs --
+  if (routes::airlabsActive()) {
+    snprintf(buf, sizeof(buf),
+             "<b>AirLabs:</b> active &bull; %lu of %lu lookups this month"
+             "<br><small>An independent maintained schedule database, "
+             "tried when AeroAPI is off or also misses.</small>"
+             "<form method=post action=/set class=row><button name=airlabsclr "
+             "value=1 class=danger>Remove key</button></form>",
+             (unsigned long)routes::airlabsUsedThisMonth(),
+             (unsigned long)cfg::kAirlabsMonthlyCap);
+    h += buf;
+  } else {
+    h += F(
+        "<b>AirLabs</b> (free upgrade): an alternative maintained schedule "
+        "database &mdash; a second chance at routes the free community DB "
+        "doesn't have. AirLabs offers a free tier for light use; check "
+        "current limits when you sign up, and this device caps its own "
+        "usage as a safety net.<br><small>Free account &amp; key at "
+        "<b>airlabs.co</b>:</small>"
+        "<form method=post action=/set class=row><input name=airlabskey "
+        "size=28 placeholder='AirLabs key'><button>Save</button></form>");
   }
   h += F("</div>");
 
@@ -409,6 +443,16 @@ void handleSet() {
   if (s_server.hasArg("aeroclr")) {
     routes::setAeroKey("");
     notice = "AeroAPI key removed — back to the free database.";
+  }
+  if (s_server.hasArg("airlabskey") && s_server.arg("airlabskey").length() > 0) {
+    String k = s_server.arg("airlabskey");
+    k.trim();
+    routes::setAirlabsKey(k.c_str());
+    notice = "AirLabs key saved.";
+  }
+  if (s_server.hasArg("airlabsclr")) {
+    routes::setAirlabsKey("");
+    notice = "AirLabs key removed.";
   }
   if (s_server.hasArg("flt")) {
     char flt[5] = {0};
