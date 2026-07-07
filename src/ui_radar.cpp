@@ -23,7 +23,31 @@ namespace ui {
 
 namespace {
 
-// ---- palette (radar phosphor) ----
+// ---- palette ----
+#ifdef SWA_THEME
+// Southwest Heart livery: Bold Blue #304CB2, Warm Red #D5152E,
+// Sunrise Yellow #FFBF27, Summit Silver #CCCCCC (verified corporate hexes).
+// Neutrals (black bg, grays) carry the canvas; every colored element uses
+// exact brand values. Warm Red is reserved for emergencies.
+const lv_color_t kColBg = lv_color_hex(0x000000);
+const lv_color_t kColGrid = lv_color_hex(0x304CB2);
+const lv_color_t kColGridBright = lv_color_hex(0x304CB2);
+const lv_color_t kColSweep = lv_color_hex(0xFFBF27);
+const lv_color_t kColPlane = lv_color_hex(0x304CB2);
+const lv_color_t kColPlaneGnd = lv_color_hex(0xCCCCCC);
+const lv_color_t kColTrail = lv_color_hex(0xFFBF27);
+const lv_color_t kColRoute = lv_color_hex(0xFFBF27);
+const lv_color_t kColSel = lv_color_hex(0xFFFFFF);
+const lv_color_t kColText = lv_color_hex(0xFFFFFF);
+const lv_color_t kColTextDim = lv_color_hex(0xCCCCCC);
+const lv_color_t kColAirport = lv_color_hex(0xCCCCCC);
+const lv_color_t kColEmerg = lv_color_hex(0xD5152E);
+const lv_color_t kColAirline = lv_color_hex(0x304CB2);
+const lv_color_t kColCardBg = lv_color_hex(0x0A1030);
+const lv_color_t kColPanelBg = lv_color_hex(0x060A20);
+const lv_color_t kColHint = lv_color_hex(0x4A5578);
+#else
+// Radar phosphor (standard build)
 const lv_color_t kColBg = lv_color_hex(0x000000);
 const lv_color_t kColGrid = lv_color_hex(0x0d3a1e);
 const lv_color_t kColGridBright = lv_color_hex(0x1c5c31);
@@ -38,6 +62,10 @@ const lv_color_t kColTextDim = lv_color_hex(0x4d8f66);
 const lv_color_t kColAirport = lv_color_hex(0x3f8ea3);  // muted cyan
 const lv_color_t kColEmerg = lv_color_hex(0xff4d4d);    // emergency squawk
 const lv_color_t kColAirline = lv_color_hex(0xe8f6ff);  // airliners (ice white)
+const lv_color_t kColCardBg = lv_color_hex(0x07200f);
+const lv_color_t kColPanelBg = lv_color_hex(0x03140a);
+const lv_color_t kColHint = lv_color_hex(0x2a4a36);
+#endif
 
 constexpr float kCx = cfg::kScreenW / 2.0f;
 constexpr float kCy = cfg::kScreenH / 2.0f;
@@ -90,6 +118,10 @@ char s_acLogoTried[4] = {0};  // late-logo guard: one retry per airline code
 
 // Settings page (swipe up) + nearby list (swipe down)
 lv_obj_t* s_setPage = nullptr;
+lv_obj_t* s_setPg[2] = {nullptr, nullptr};  // settings sub-pages (dial flips)
+uint8_t s_setPgIdx = 0;
+lv_obj_t* s_setTitle = nullptr;
+lv_obj_t* s_setFltLbl = nullptr;
 lv_obj_t* s_setTxtLbl = nullptr;
 lv_obj_t* s_setUnitLbl = nullptr;
 lv_obj_t* s_setWifiLbl = nullptr;
@@ -158,8 +190,10 @@ void loadPrefs() {
   gApp.altUnit = p.getUChar("altu", 0);
   gApp.spdUnit = p.getUChar("spdu", 0);
   gApp.airlineColors = p.getBool("acol", true);
-  gApp.colComm = min(p.getUChar("ccol", 0), (uint8_t)(kPlaneColorCount - 1));
-  gApp.colPriv = min(p.getUChar("pcol", 5), (uint8_t)(kPlaneColorCount - 1));
+  gApp.colComm = min(p.getUChar("ccol", kPlaneColorDefaultComm),
+                     (uint8_t)(kPlaneColorCount - 1));
+  gApp.colPriv = min(p.getUChar("pcol", kPlaneColorDefaultPriv),
+                     (uint8_t)(kPlaneColorCount - 1));
   gApp.textLarge = p.getBool("txtl", false);
   char flt[8];
   strlcpy(flt, p.getString("flt", DEFAULT_CALLSIGN_FILTER).c_str(),
@@ -625,7 +659,23 @@ void tutorialPrev() {
 
 // ---------- settings page ----------
 
+void showSetPage() {
+  for (int i = 0; i < 2; i++) {
+    if (!s_setPg[i]) continue;
+    if (i == s_setPgIdx) lv_obj_clear_flag(s_setPg[i], LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_add_flag(s_setPg[i], LV_OBJ_FLAG_HIDDEN);
+  }
+  if (s_setTitle)
+    lv_label_set_text_fmt(s_setTitle, "SETTINGS  %d/2", s_setPgIdx + 1);
+}
+
 void refreshSettingsLabels() {
+  char flt[5];
+  if (gApp.getCallsignFilter(flt)) {
+    lv_label_set_text_fmt(s_setFltLbl, "Planes: %s only", flt);
+  } else {
+    lv_label_set_text(s_setFltLbl, "Planes: all");
+  }
   lv_label_set_text_fmt(s_setTxtLbl, "Text size: %s",
                         gApp.textLarge.load() ? "large" : "normal");
   static const char* kUnitNames[3] = {"ft & kt", "ft & mph", "m & km/h"};
@@ -656,6 +706,8 @@ void refreshSettingsLabels() {
 void openSettings() {
   s_setOpen = true;
   s_wifiConfirmMs = 0;
+  s_setPgIdx = 0;
+  showSetPage();
   refreshSettingsLabels();
   lv_obj_clear_flag(s_setPage, LV_OBJ_FLAG_HIDDEN);
 }
@@ -1242,7 +1294,7 @@ void init() {
   lv_obj_remove_style_all(s_panel);
   lv_obj_set_size(s_panel, 260, 96);
   lv_obj_align(s_panel, LV_ALIGN_BOTTOM_MID, 0, -52);
-  lv_obj_set_style_bg_color(s_panel, lv_color_hex(0x03140a), 0);
+  lv_obj_set_style_bg_color(s_panel, kColPanelBg, 0);
   lv_obj_set_style_bg_opa(s_panel, LV_OPA_80, 0);
   lv_obj_set_style_radius(s_panel, 14, 0);
   lv_obj_set_style_border_color(s_panel, kColGridBright, 0);
@@ -1310,7 +1362,7 @@ void init() {
   lv_obj_set_size(s_acMono, 76, 76);
   lv_obj_align(s_acMono, LV_ALIGN_TOP_MID, 0, 64);
   lv_obj_set_style_radius(s_acMono, LV_RADIUS_CIRCLE, 0);
-  lv_obj_set_style_bg_color(s_acMono, lv_color_hex(0x07200f), 0);
+  lv_obj_set_style_bg_color(s_acMono, kColCardBg, 0);
   lv_obj_set_style_bg_opa(s_acMono, LV_OPA_COVER, 0);
   lv_obj_set_style_border_width(s_acMono, 3, 0);
   lv_obj_set_style_border_color(s_acMono, kColGridBright, 0);
@@ -1359,18 +1411,27 @@ void init() {
   lv_obj_set_style_bg_opa(s_setPage, LV_OPA_COVER, 0);
   lv_obj_add_flag(s_setPage, LV_OBJ_FLAG_HIDDEN);
 
-  lv_obj_t* title = lv_label_create(s_setPage);
-  lv_obj_set_style_text_color(title, kColText, 0);
-  lv_obj_set_style_text_font(title, &lv_font_montserrat_16, 0);
-  lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 14);
-  lv_label_set_text(title, "SETTINGS");
+  s_setTitle = lv_label_create(s_setPage);
+  lv_obj_set_style_text_color(s_setTitle, kColText, 0);
+  lv_obj_set_style_text_font(s_setTitle, &lv_font_montserrat_16, 0);
+  lv_obj_align(s_setTitle, LV_ALIGN_TOP_MID, 0, 14);
+  lv_label_set_text(s_setTitle, "SETTINGS  1/2");
 
-  auto makeRow = [&](int y, lv_event_cb_t cb, int w = 250) -> lv_obj_t* {
-    lv_obj_t* row = lv_obj_create(s_setPage);
+  for (int i = 0; i < 2; i++) {
+    s_setPg[i] = lv_obj_create(s_setPage);
+    lv_obj_remove_style_all(s_setPg[i]);
+    lv_obj_set_size(s_setPg[i], cfg::kScreenW, cfg::kScreenH);
+    lv_obj_set_pos(s_setPg[i], 0, 0);
+    lv_obj_add_flag(s_setPg[i], LV_OBJ_FLAG_EVENT_BUBBLE);
+  }
+
+  auto makeRow = [&](lv_obj_t* pg, int y, lv_event_cb_t cb,
+                     int w = 260) -> lv_obj_t* {
+    lv_obj_t* row = lv_obj_create(pg);
     lv_obj_remove_style_all(row);
     lv_obj_set_size(row, w, 48);
     lv_obj_align(row, LV_ALIGN_TOP_MID, 0, y);
-    lv_obj_set_style_bg_color(row, lv_color_hex(0x07200f), 0);
+    lv_obj_set_style_bg_color(row, kColCardBg, 0);
     lv_obj_set_style_bg_opa(row, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(row, 10, 0);
     lv_obj_set_style_border_color(row, kColGridBright, 0);
@@ -1388,13 +1449,33 @@ void init() {
 
   // Seven rows at h36/gap6; the bottom one narrows to fit the circle.
   // "Find location again" lives on the knob long-press + web page.
-  s_setTxtLbl = makeRow(52, [](lv_event_t*) {
+  // ----- page 1: planes filter, text size, units -----
+  s_setFltLbl = makeRow(s_setPg[0], 52, [](lv_event_t*) {
+    if (s_swiped) return;
+    char cur[5];
+    Preferences p;
+    p.begin("ui", false);
+    if (gApp.getCallsignFilter(cur)) {
+      gApp.setCallsignFilter("");
+      p.putString("flt", "");
+    } else {
+      String last = p.getString("fltL", DEFAULT_CALLSIGN_FILTER[0]
+                                            ? DEFAULT_CALLSIGN_FILTER
+                                            : "SWA");
+      gApp.setCallsignFilter(last.c_str());
+      p.putString("flt", last);
+    }
+    p.end();
+    refreshSettingsLabels();
+  });
+
+  s_setTxtLbl = makeRow(s_setPg[0], 108, [](lv_event_t*) {
     if (s_swiped) return;
     gApp.textLarge = !gApp.textLarge.load();
     savePrefs();
     refreshSettingsLabels();  // applyTextSize runs from the tick watcher
   });
-  s_setUnitLbl = makeRow(108, [](lv_event_t*) {
+  s_setUnitLbl = makeRow(s_setPg[0], 164, [](lv_event_t*) {
     if (s_swiped) return;
     // Cycle presets: ft&kt -> ft&mph -> m&km/h.
     uint8_t preset = gApp.altUnit.load() == 1 ? 2
@@ -1406,13 +1487,14 @@ void init() {
     savePrefs();
     refreshSettingsLabels();
   });
-  lv_obj_t* tutLbl = makeRow(164, [](lv_event_t*) {
+  // ----- page 2: help, wifi, device info -----
+  lv_obj_t* tutLbl = makeRow(s_setPg[1], 52, [](lv_event_t*) {
     if (s_swiped) return;
     closeSettings();
     openTutorial();
   });
   lv_label_set_text(tutLbl, "How to use");
-  s_setWifiLbl = makeRow(220, [](lv_event_t*) {
+  s_setWifiLbl = makeRow(s_setPg[1], 108, [](lv_event_t*) {
     if (s_swiped) return;
     // Two-tap confirm: erasing WiFi credentials forces re-setup.
     if (millis() - s_wifiConfirmMs < 3000) {
@@ -1438,17 +1520,17 @@ void init() {
       },
       LV_EVENT_RELEASED, nullptr);
 
-  s_setInfoLbl = lv_label_create(s_setPage);
+  s_setInfoLbl = lv_label_create(s_setPg[1]);
   lv_obj_set_style_text_color(s_setInfoLbl, kColTextDim, 0);
   lv_obj_set_style_text_font(s_setInfoLbl, &lv_font_montserrat_10, 0);
   lv_obj_set_style_text_align(s_setInfoLbl, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_align(s_setInfoLbl, LV_ALIGN_BOTTOM_MID, 0, -40);
+  lv_obj_align(s_setInfoLbl, LV_ALIGN_TOP_MID, 0, 178);
 
   lv_obj_t* setHint = lv_label_create(s_setPage);
-  lv_obj_set_style_text_color(setHint, lv_color_hex(0x2a4a36), 0);
+  lv_obj_set_style_text_color(setHint, kColHint, 0);
   lv_obj_set_style_text_font(setHint, &lv_font_montserrat_10, 0);
   lv_obj_align(setHint, LV_ALIGN_BOTTOM_MID, 0, -22);
-  lv_label_set_text(setHint, "swipe down to close");
+  lv_label_set_text(setHint, "dial: page 1/2  \xE2\x80\xA2  swipe down: close");
 
   // ----- nearby list (swipe down from the radar) -----
   s_nearPage = lv_obj_create(scr);
@@ -1558,7 +1640,10 @@ void tick() {
     return;
   }
   if (s_setOpen) {
-    hal::encoderTakeSteps();
+    if (hal::encoderTakeSteps() != 0) {
+      s_setPgIdx ^= 1;
+      showSetPage();
+    }
     if (hal::encoderTakeClick()) closeSettings();
     hal::encoderTakeLongPress();
     // Reset the two-tap confirms if they timed out.

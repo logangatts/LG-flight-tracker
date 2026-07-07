@@ -10,6 +10,33 @@ enum class LocSource : uint8_t { Unset, Cached, Manual, WifiGeo, IpGeo };
 
 enum class NetPhase : uint8_t { Boot, Portal, Connecting, Locating, Running };
 
+// Plane color palette (web-selectable). Red is offered but not default:
+// it competes with the emergency highlight.
+struct PlaneColor {
+  uint32_t hex;
+  const char* name;
+};
+#ifdef SWA_THEME
+// Southwest corporate palette (Heart livery): Bold Blue, Warm Red,
+// Sunrise Yellow, Summit Silver.
+inline constexpr PlaneColor kPlaneColors[] = {
+    {0x304CB2, "bold blue"},      {0xD5152E, "warm red"},
+    {0xFFBF27, "sunrise yellow"}, {0xCCCCCC, "summit silver"},
+    {0xFFFFFF, "white"},
+};
+inline constexpr uint8_t kPlaneColorDefaultComm = 0;  // bold blue
+inline constexpr uint8_t kPlaneColorDefaultPriv = 2;  // sunrise yellow
+#else
+inline constexpr PlaneColor kPlaneColors[] = {
+    {0x4DA6FF, "blue"}, {0xFF5252, "red"},  {0xFFA64D, "orange"},
+    {0xE8F6FF, "white"}, {0xFF7AD9, "pink"}, {0x3CFF81, "green"},
+};
+inline constexpr uint8_t kPlaneColorDefaultComm = 0;
+inline constexpr uint8_t kPlaneColorDefaultPriv = 5;
+#endif
+inline constexpr uint8_t kPlaneColorCount =
+    sizeof(kPlaneColors) / sizeof(kPlaneColors[0]);
+
 struct AppState {
   // Radar center (written by geolocation / portal, read everywhere).
   std::atomic<float> centerLat{cfg::kFallbackLat};
@@ -36,8 +63,8 @@ struct AppState {
   std::atomic<uint8_t> altUnit{0};       // 0 = ft, 1 = m
   std::atomic<uint8_t> spdUnit{0};       // 0 = kt, 1 = mph, 2 = km/h
   std::atomic<bool> airlineColors{true}; // distinct color for airliners
-  std::atomic<uint8_t> colComm{0};       // palette idx, commercial (default blue)
-  std::atomic<uint8_t> colPriv{5};       // palette idx, private/GA (default green)
+  std::atomic<uint8_t> colComm{kPlaneColorDefaultComm};
+  std::atomic<uint8_t> colPriv{kPlaneColorDefaultPriv};
   std::atomic<bool> textLarge{false};    // bump reading text one font step
 
   // Callsign-prefix filter, packed into a u32 (max 4 chars) so cross-task
@@ -104,15 +131,3 @@ void devicePassword(char* out);
 void fmtAlt(int32_t altFt, char* out, size_t n);
 void fmtSpeed(float gsKt, char* out, size_t n);
 
-// Plane color palette (web-selectable). Red is offered but not default:
-// it competes with the emergency highlight.
-struct PlaneColor {
-  uint32_t hex;
-  const char* name;
-};
-inline constexpr PlaneColor kPlaneColors[] = {
-    {0x4DA6FF, "blue"}, {0xFF5252, "red"},  {0xFFA64D, "orange"},
-    {0xE8F6FF, "white"}, {0xFF7AD9, "pink"}, {0x3CFF81, "green"},
-};
-inline constexpr uint8_t kPlaneColorCount =
-    sizeof(kPlaneColors) / sizeof(kPlaneColors[0]);

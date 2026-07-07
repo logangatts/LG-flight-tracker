@@ -16,6 +16,30 @@
 
 namespace websrv {
 
+// Web palette (themed per flavor at compile time).
+#ifdef SWA_THEME
+#define W_BG "#070B1E"
+#define W_CARD "#0C1230"
+#define W_FLD "#131C44"
+#define W_TXT "#E8EAF2"
+#define W_DIM "#9AA1B8"
+#define W_BRD "#304CB2"
+#define W_ACC "#FFBF27"
+#define W_DGB "#D5152E"
+#define W_DGT "#D5152E"
+#else
+#define W_BG "#04140a"
+#define W_CARD "#07200f"
+#define W_FLD "#0b2a16"
+#define W_TXT "#9df5bd"
+#define W_DIM "#4d8f66"
+#define W_BRD "#1c5c31"
+#define W_ACC "#27f06c"
+#define W_DGB "#7a2222"
+#define W_DGT "#ff8484"
+#endif
+
+
 namespace {
 
 WebServer s_server(80);
@@ -42,12 +66,12 @@ String loginPage(const char* msg) {
       "<!doctype html><html><head><meta charset=utf-8>"
       "<meta name=viewport content='width=device-width,initial-scale=1'>"
       "<title>FlightRadar</title><style>"
-      "body{background:#04140a;color:#9df5bd;font-family:system-ui,sans-serif;"
+      "body{background:" W_BG ";color:" W_TXT ";font-family:system-ui,sans-serif;"
       "max-width:430px;margin:40px auto;padding:16px;text-align:center}"
-      "h1{color:#27f06c}input,button{background:#0b2a16;color:#9df5bd;"
-      "border:1px solid #1c5c31;border-radius:8px;padding:10px 14px;"
-      "font-size:1.1em;margin:4px}small{color:#4d8f66}"
-      ".err{color:#ff8484}</style></head><body><h1>FlightRadar</h1>"
+      "h1{color:" W_ACC "}input,button{background:" W_FLD ";color:" W_TXT ";"
+      "border:1px solid " W_BRD ";border-radius:8px;padding:10px 14px;"
+      "font-size:1.1em;margin:4px}small{color:" W_DIM "}"
+      ".err{color:" W_DGT "}</style></head><body><h1>FlightRadar</h1>"
       "<p>Enter the password shown on the device<br><small>(swipe up on the "
       "radar &rarr; bottom of the settings page)</small></p>"
       "<form method=post action=/login><input name=pin maxlength=8 "
@@ -155,22 +179,22 @@ String page(const char* notice = nullptr) {
       "<!doctype html><html><head><meta charset=utf-8>"
       "<meta name=viewport content='width=device-width,initial-scale=1'>"
       "<title>FlightRadar</title><style>"
-      "body{background:#04140a;color:#9df5bd;font-family:system-ui,sans-serif;"
+      "body{background:" W_BG ";color:" W_TXT ";font-family:system-ui,sans-serif;"
       "max-width:430px;margin:0 auto;padding:16px 16px 32px}"
-      "h1{color:#27f06c;font-size:1.4em;margin-bottom:4px}"
-      "h2{font-size:.78em;color:#4d8f66;margin:20px 0 6px;"
+      "h1{color:" W_ACC ";font-size:1.4em;margin-bottom:4px}"
+      "h2{font-size:.78em;color:" W_DIM ";margin:20px 0 6px;"
       "text-transform:uppercase;letter-spacing:.08em}"
-      ".card{background:#07200f;border:1px solid #1c5c31;border-radius:12px;"
+      ".card{background:" W_CARD ";border:1px solid " W_BRD ";border-radius:12px;"
       "padding:14px;margin-bottom:4px}"
       ".row{margin:10px 0 0}.row:first-child{margin-top:0}"
-      ".lbl{display:inline-block;min-width:78px;color:#4d8f66;font-size:.9em}"
-      "input,button{background:#0b2a16;color:#9df5bd;border:1px solid #1c5c31;"
+      ".lbl{display:inline-block;min-width:78px;color:" W_DIM ";font-size:.9em}"
+      "input,button{background:" W_FLD ";color:" W_TXT ";border:1px solid " W_BRD ";"
       "border-radius:8px;padding:8px 12px;font-size:1em;margin:2px 6px 2px 0}"
-      "button{cursor:pointer}button.on{border-color:#27f06c}"
-      ".danger{border-color:#7a2222;color:#ff8484}"
-      ".note{background:#0b2a16;border:1px solid #27f06c;border-radius:8px;"
+      "button{cursor:pointer}button.on{border-color:" W_ACC "}"
+      ".danger{border-color:" W_DGB ";color:" W_DGT "}"
+      ".note{background:" W_FLD ";border:1px solid " W_ACC ";border-radius:8px;"
       "padding:10px;margin-bottom:12px}"
-      "small{color:#4d8f66;line-height:1.4}"
+      "small{color:" W_DIM ";line-height:1.4}"
       ".sw{width:34px;height:26px;padding:0}"
       "</style></head><body><h1>FlightRadar</h1>");
 
@@ -244,7 +268,7 @@ String page(const char* notice = nullptr) {
                "style='background:#%06lX%s'></button>",
                arg, i, kPlaneColors[i].name,
                (unsigned long)kPlaneColors[i].hex,
-               i == cur ? ";border:2px solid #27f06c" : "");
+               i == cur ? ";border:2px solid " W_ACC "" : "");
       h += buf;
     }
     h += F("</div>");
@@ -395,6 +419,7 @@ void handleSet() {
     Preferences p;
     p.begin("ui", false);
     p.putString("flt", flt);
+    if (flt[0]) p.putString("fltL", flt);  // device toggle restores this
     p.end();
     notice = flt[0] ? "Airline filter set." : "Airline filter cleared.";
   }
