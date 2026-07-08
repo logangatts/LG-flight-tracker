@@ -106,6 +106,11 @@ class AircraftStore {
   // Current position of an aircraft by callsign (for route plausibility).
   bool getPosByCallsign(const char* callsign, float* lat, float* lon);
 
+  // Immediately drop aircraft whose callsign doesn't start with prefix
+  // (empty prefix = no-op). Called when the airline filter changes so the
+  // switch is instant instead of waiting out the 30 s aging TTL.
+  void purgeNonCallsign(const char* prefix);
+
   // --- UI task side ---
   void snapshot(AircraftSnapshot& out);
   int count();

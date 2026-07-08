@@ -473,6 +473,8 @@ void handleSet() {
     p.putString("flt", flt);
     if (flt[0]) p.putString("fltL", flt);  // device toggle restores this
     p.end();
+    if (flt[0]) gAircraft.purgeNonCallsign(flt);  // drop non-matching now
+    gApp.pollNowReq = true;
     notice = flt[0] ? "Airline filter set." : "Airline filter cleared.";
   }
   if (s_server.hasArg("ccol")) {

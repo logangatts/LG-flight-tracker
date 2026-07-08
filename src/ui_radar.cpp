@@ -1634,6 +1634,11 @@ void init() {
       p.putString("flt", last);
     }
     p.end();
+    // Drop already-tracked non-matching planes now (don't wait 30 s), and
+    // pull a fresh poll immediately.
+    char nowFlt[5];
+    if (gApp.getCallsignFilter(nowFlt)) gAircraft.purgeNonCallsign(nowFlt);
+    gApp.pollNowReq = true;
     refreshSettingsLabels();
   });
 

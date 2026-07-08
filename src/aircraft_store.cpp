@@ -191,6 +191,17 @@ bool AircraftStore::getPosByCallsign(const char* callsign, float* lat,
   return found;
 }
 
+void AircraftStore::purgeNonCallsign(const char* prefix) {
+  if (!prefix || !prefix[0]) return;
+  size_t n = strlen(prefix);
+  xSemaphoreTake(mutex_, portMAX_DELAY);
+  for (int i = 0; i < cfg::kMaxAircraft; i++) {
+    if (ac_[i].used && strncmp(ac_[i].callsign, prefix, n) != 0)
+      ac_[i].used = false;
+  }
+  xSemaphoreGive(mutex_);
+}
+
 int AircraftStore::count() {
   int n = 0;
   xSemaphoreTake(mutex_, portMAX_DELAY);
