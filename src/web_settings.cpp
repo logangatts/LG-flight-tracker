@@ -16,30 +16,27 @@
 
 namespace websrv {
 
-// Web palette (themed per flavor at compile time).
+// Web palette, selected at request time so it matches the device: strict
+// Southwest corporate colors while in SWA-only mode, radar green otherwise.
+struct WebPal {
+  const char *bg, *card, *fld, *txt, *dim, *brd, *acc, *dgb, *dgt;
+};
+
+WebPal webPal() {
+  static const WebPal grn = {"#04140a", "#07200f", "#0b2a16",
+                             "#9df5bd", "#4d8f66", "#1c5c31",
+                             "#27f06c", "#7a2222", "#ff8484"};
 #ifdef SWA_THEME
-// Strict corporate palette: Bold Blue, Warm Red, Sunrise Yellow, Summit
-// Silver + neutral black/white only. Structure comes from blue borders.
-#define W_BG "#000000"
-#define W_CARD "#000000"
-#define W_FLD "#000000"
-#define W_TXT "#FFFFFF"
-#define W_DIM "#CCCCCC"
-#define W_BRD "#304CB2"
-#define W_ACC "#FFBF27"
-#define W_DGB "#D5152E"
-#define W_DGT "#D5152E"
-#else
-#define W_BG "#04140a"
-#define W_CARD "#07200f"
-#define W_FLD "#0b2a16"
-#define W_TXT "#9df5bd"
-#define W_DIM "#4d8f66"
-#define W_BRD "#1c5c31"
-#define W_ACC "#27f06c"
-#define W_DGB "#7a2222"
-#define W_DGT "#ff8484"
+  // Bold Blue / Warm Red / Sunrise Yellow / Summit Silver on black.
+  static const WebPal swa = {"#000000", "#000000", "#000000",
+                             "#FFFFFF", "#CCCCCC", "#304CB2",
+                             "#FFBF27", "#D5152E", "#D5152E"};
+  char f[5];
+  gApp.getCallsignFilter(f);
+  if (strcmp(f, "SWA") == 0) return swa;
 #endif
+  return grn;
+}
 
 
 namespace {
@@ -62,18 +59,23 @@ bool authed() {
 }
 
 String loginPage(const char* msg) {
+  WebPal w = webPal();
   String h;
   h.reserve(1024);
+  char css[420];
+  snprintf(css, sizeof(css),
+           "<!doctype html><html><head><meta charset=utf-8>"
+           "<meta name=viewport content='width=device-width,initial-scale=1'>"
+           "<title>FlightRadar</title><style>"
+           "body{background:%s;color:%s;font-family:system-ui,sans-serif;"
+           "max-width:430px;margin:40px auto;padding:16px;text-align:center}"
+           "h1{color:%s}input,button{background:%s;color:%s;"
+           "border:1px solid %s;border-radius:8px;padding:10px 14px;"
+           "font-size:1.1em;margin:4px}small{color:%s}"
+           ".err{color:%s}</style></head><body><h1>FlightRadar</h1>",
+           w.bg, w.txt, w.acc, w.fld, w.txt, w.brd, w.dim, w.dgt);
+  h += css;
   h += F(
-      "<!doctype html><html><head><meta charset=utf-8>"
-      "<meta name=viewport content='width=device-width,initial-scale=1'>"
-      "<title>FlightRadar</title><style>"
-      "body{background:" W_BG ";color:" W_TXT ";font-family:system-ui,sans-serif;"
-      "max-width:430px;margin:40px auto;padding:16px;text-align:center}"
-      "h1{color:" W_ACC "}input,button{background:" W_FLD ";color:" W_TXT ";"
-      "border:1px solid " W_BRD ";border-radius:8px;padding:10px 14px;"
-      "font-size:1.1em;margin:4px}small{color:" W_DIM "}"
-      ".err{color:" W_DGT "}</style></head><body><h1>FlightRadar</h1>"
       "<p>Enter the password shown on the device<br><small>(swipe up on the "
       "radar &rarr; bottom of the settings page)</small></p>"
       "<form method=post action=/login><input name=pin maxlength=8 "
@@ -175,32 +177,35 @@ bool geocode(const char* query, float* lat, float* lon, char* place,
 
 String page(const char* notice = nullptr) {
   uint8_t bri = gApp.briIdx.load();
+  WebPal w = webPal();
   String h;
   h.reserve(6144);
-  h += F(
-      "<!doctype html><html><head><meta charset=utf-8>"
-      "<meta name=viewport content='width=device-width,initial-scale=1'>"
-      "<title>FlightRadar</title><style>"
-      "body{background:" W_BG ";color:" W_TXT ";font-family:system-ui,sans-serif;"
-      "max-width:430px;margin:0 auto;padding:16px 16px 32px}"
-      "h1{color:" W_ACC ";font-size:1.4em;margin-bottom:4px}"
-      "h2{font-size:.78em;color:" W_DIM ";margin:20px 0 6px;"
-      "text-transform:uppercase;letter-spacing:.08em}"
-      ".card{background:" W_CARD ";border:1px solid " W_BRD ";border-radius:12px;"
-      "padding:14px;margin-bottom:4px}"
-      ".row{margin:10px 0 0}.row:first-child{margin-top:0}"
-      ".lbl{display:inline-block;min-width:78px;color:" W_DIM ";font-size:.9em}"
-      "input,button{background:" W_FLD ";color:" W_TXT ";border:1px solid " W_BRD ";"
-      "border-radius:8px;padding:8px 12px;font-size:1em;margin:2px 6px 2px 0}"
-      "button{cursor:pointer}button.on{border-color:" W_ACC "}"
-      ".danger{border-color:" W_DGB ";color:" W_DGT "}"
-      ".note{background:" W_FLD ";border:1px solid " W_ACC ";border-radius:8px;"
-      "padding:10px;margin-bottom:12px}"
-      "small{color:" W_DIM ";line-height:1.4}"
-      ".sw{width:34px;height:26px;padding:0}"
-      "</style></head><body><h1>FlightRadar</h1>");
-
-  char buf[240];
+  char buf[520];
+  snprintf(buf, sizeof(buf),
+           "<!doctype html><html><head><meta charset=utf-8>"
+           "<meta name=viewport content='width=device-width,initial-scale=1'>"
+           "<title>FlightRadar</title><style>"
+           "body{background:%s;color:%s;font-family:system-ui,sans-serif;"
+           "max-width:430px;margin:0 auto;padding:16px 16px 32px}"
+           "h1{color:%s;font-size:1.4em;margin-bottom:4px}"
+           "h2{font-size:.78em;color:%s;margin:20px 0 6px;"
+           "text-transform:uppercase;letter-spacing:.08em}"
+           ".card{background:%s;border:1px solid %s;border-radius:12px;"
+           "padding:14px;margin-bottom:4px}"
+           ".row{margin:10px 0 0}.row:first-child{margin-top:0}"
+           ".lbl{display:inline-block;min-width:78px;color:%s;font-size:.9em}"
+           "input,button{background:%s;color:%s;border:1px solid %s;"
+           "border-radius:8px;padding:8px 12px;font-size:1em;margin:2px 6px 2px 0}"
+           "button{cursor:pointer}button.on{border-color:%s}"
+           ".danger{border-color:%s;color:%s}"
+           ".note{background:%s;border:1px solid %s;border-radius:8px;"
+           "padding:10px;margin-bottom:12px}"
+           "small{color:%s;line-height:1.4}"
+           ".sw{width:34px;height:26px;padding:0}"
+           "</style></head><body><h1>FlightRadar</h1>",
+           w.bg, w.txt, w.acc, w.dim, w.card, w.brd, w.dim, w.fld, w.txt, w.brd,
+           w.acc, w.dgb, w.dgt, w.fld, w.acc, w.dim);
+  h += buf;
 
   if (notice) {
     h += "<div class=note>";
@@ -265,12 +270,13 @@ String page(const char* notice = nullptr) {
              row == 0 ? "Airlines" : "Small planes");
     h += buf;
     for (int i = 0; i < kPlaneColorCount; i++) {
+      char sel[40] = "";
+      if (i == cur) snprintf(sel, sizeof(sel), ";border:2px solid %s", w.acc);
       snprintf(buf, sizeof(buf),
                "<button class=sw name=%s value=%d title='%s' "
                "style='background:#%06lX%s'></button>",
                arg, i, kPlaneColors[i].name,
-               (unsigned long)kPlaneColors[i].hex,
-               i == cur ? ";border:2px solid " W_ACC "" : "");
+               (unsigned long)kPlaneColors[i].hex, sel);
       h += buf;
     }
     h += F("</div>");

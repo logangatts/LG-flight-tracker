@@ -16,24 +16,14 @@ struct PlaneColor {
   uint32_t hex;
   const char* name;
 };
-#ifdef SWA_THEME
-// Southwest corporate palette (Heart livery): Bold Blue, Warm Red,
-// Sunrise Yellow, Summit Silver.
-inline constexpr PlaneColor kPlaneColors[] = {
-    {0x304CB2, "bold blue"},      {0xD5152E, "warm red"},
-    {0xFFBF27, "sunrise yellow"}, {0xCCCCCC, "summit silver"},
-    {0xFFFFFF, "white"},
-};
-inline constexpr uint8_t kPlaneColorDefaultComm = 0;  // bold blue
-inline constexpr uint8_t kPlaneColorDefaultPriv = 2;  // sunrise yellow
-#else
+// User-selectable plane colors (web pickers). Applies when NOT in the
+// Southwest brand theme; SWA-only mode forces the corporate hexes instead.
 inline constexpr PlaneColor kPlaneColors[] = {
     {0x4DA6FF, "blue"}, {0xFF5252, "red"},  {0xFFA64D, "orange"},
     {0xE8F6FF, "white"}, {0xFF7AD9, "pink"}, {0x3CFF81, "green"},
 };
 inline constexpr uint8_t kPlaneColorDefaultComm = 0;
 inline constexpr uint8_t kPlaneColorDefaultPriv = 5;
-#endif
 inline constexpr uint8_t kPlaneColorCount =
     sizeof(kPlaneColors) / sizeof(kPlaneColors[0]);
 

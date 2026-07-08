@@ -23,49 +23,75 @@ namespace ui {
 
 namespace {
 
-// ---- palette ----
+// ---- palette (runtime-swappable) ----
+// The SWA build ships BOTH palettes and switches live: Southwest brand
+// colors while the SWA-only filter is active, standard radar-green when
+// showing all traffic. The standard build only ever uses green.
+struct Palette {
+  uint32_t bg, grid, gridBright, sweep, plane, planeGnd, trail, route, sel,
+      text, textDim, airport, emerg, airline, cardBg, panelBg, hint;
+};
+
+// Radar phosphor green (default / standard build).
+constexpr Palette kPalGreen = {
+    0x000000, 0x0d3a1e, 0x1c5c31, 0x27f06c, 0x3cff81, 0x1a7a41,
+    0x2bd05f, 0x37b6ff, 0xfff27a, 0x9df5bd, 0x4d8f66, 0x3f8ea3,
+    0xff4d4d, 0xe8f6ff, 0x07200f, 0x03140a, 0x2a4a36};
 #ifdef SWA_THEME
-// Southwest Heart livery: Bold Blue #304CB2, Warm Red #D5152E,
-// Sunrise Yellow #FFBF27, Summit Silver #CCCCCC (verified corporate hexes).
-// Neutrals (black bg, grays) carry the canvas; every colored element uses
-// exact brand values. Warm Red is reserved for emergencies.
-const lv_color_t kColBg = lv_color_hex(0x000000);
-const lv_color_t kColGrid = lv_color_hex(0x304CB2);
-const lv_color_t kColGridBright = lv_color_hex(0x304CB2);
-const lv_color_t kColSweep = lv_color_hex(0xFFBF27);
-const lv_color_t kColPlane = lv_color_hex(0x304CB2);
-const lv_color_t kColPlaneGnd = lv_color_hex(0xCCCCCC);
-const lv_color_t kColTrail = lv_color_hex(0xFFBF27);
-const lv_color_t kColRoute = lv_color_hex(0xFFBF27);
-const lv_color_t kColSel = lv_color_hex(0xFFFFFF);
-const lv_color_t kColText = lv_color_hex(0xFFFFFF);
-const lv_color_t kColTextDim = lv_color_hex(0xCCCCCC);
-const lv_color_t kColAirport = lv_color_hex(0xCCCCCC);
-const lv_color_t kColEmerg = lv_color_hex(0xD5152E);
-const lv_color_t kColAirline = lv_color_hex(0x304CB2);
-const lv_color_t kColCardBg = lv_color_hex(0x0A1030);
-const lv_color_t kColPanelBg = lv_color_hex(0x060A20);
-const lv_color_t kColHint = lv_color_hex(0x4A5578);
-#else
-// Radar phosphor (standard build)
-const lv_color_t kColBg = lv_color_hex(0x000000);
-const lv_color_t kColGrid = lv_color_hex(0x0d3a1e);
-const lv_color_t kColGridBright = lv_color_hex(0x1c5c31);
-const lv_color_t kColSweep = lv_color_hex(0x27f06c);
-const lv_color_t kColPlane = lv_color_hex(0x3cff81);
-const lv_color_t kColPlaneGnd = lv_color_hex(0x1a7a41);
-const lv_color_t kColTrail = lv_color_hex(0x2bd05f);
-const lv_color_t kColRoute = lv_color_hex(0x37b6ff);
-const lv_color_t kColSel = lv_color_hex(0xfff27a);
-const lv_color_t kColText = lv_color_hex(0x9df5bd);
-const lv_color_t kColTextDim = lv_color_hex(0x4d8f66);
-const lv_color_t kColAirport = lv_color_hex(0x3f8ea3);  // muted cyan
-const lv_color_t kColEmerg = lv_color_hex(0xff4d4d);    // emergency squawk
-const lv_color_t kColAirline = lv_color_hex(0xe8f6ff);  // airliners (ice white)
-const lv_color_t kColCardBg = lv_color_hex(0x07200f);
-const lv_color_t kColPanelBg = lv_color_hex(0x03140a);
-const lv_color_t kColHint = lv_color_hex(0x2a4a36);
+// Southwest Heart livery: Bold Blue #304CB2, Warm Red #D5152E, Sunrise
+// Yellow #FFBF27, Summit Silver #CCCCCC (verified corporate hexes).
+constexpr Palette kPalSwa = {
+    0x000000, 0x304CB2, 0x304CB2, 0xFFBF27, 0x304CB2, 0xCCCCCC,
+    0xFFBF27, 0xFFBF27, 0xFFFFFF, 0xFFFFFF, 0xCCCCCC, 0xCCCCCC,
+    0xD5152E, 0x304CB2, 0x0A1030, 0x060A20, 0x4A5578};
 #endif
+
+// Mutable actives — set by loadPalette(), read everywhere.
+lv_color_t kColBg, kColGrid, kColGridBright, kColSweep, kColPlane, kColPlaneGnd,
+    kColTrail, kColRoute, kColSel, kColText, kColTextDim, kColAirport, kColEmerg,
+    kColAirline, kColCardBg, kColPanelBg, kColHint;
+
+void loadPalette(const Palette& p) {
+  kColBg = lv_color_hex(p.bg);
+  kColGrid = lv_color_hex(p.grid);
+  kColGridBright = lv_color_hex(p.gridBright);
+  kColSweep = lv_color_hex(p.sweep);
+  kColPlane = lv_color_hex(p.plane);
+  kColPlaneGnd = lv_color_hex(p.planeGnd);
+  kColTrail = lv_color_hex(p.trail);
+  kColRoute = lv_color_hex(p.route);
+  kColSel = lv_color_hex(p.sel);
+  kColText = lv_color_hex(p.text);
+  kColTextDim = lv_color_hex(p.textDim);
+  kColAirport = lv_color_hex(p.airport);
+  kColEmerg = lv_color_hex(p.emerg);
+  kColAirline = lv_color_hex(p.airline);
+  kColCardBg = lv_color_hex(p.cardBg);
+  kColPanelBg = lv_color_hex(p.panelBg);
+  kColHint = lv_color_hex(p.hint);
+}
+
+// True when the Southwest theme should be showing (SWA build, SWA-only mode).
+bool swaThemeActive() {
+#ifdef SWA_THEME
+  char f[5];
+  gApp.getCallsignFilter(f);
+  return strcmp(f, "SWA") == 0;
+#else
+  return false;
+#endif
+}
+
+// Plane marker colors: Southwest brand colors in SWA mode (Bold Blue
+// airliners, Sunrise Yellow GA), else the user's configured picks.
+lv_color_t planeCommColor() {
+  return swaThemeActive() ? lv_color_hex(0x304CB2)
+                          : lv_color_hex(kPlaneColors[gApp.colComm.load()].hex);
+}
+lv_color_t planePrivColor() {
+  return swaThemeActive() ? lv_color_hex(0xFFBF27)
+                          : lv_color_hex(kPlaneColors[gApp.colPriv.load()].hex);
+}
 
 constexpr float kCx = cfg::kScreenW / 2.0f;
 constexpr float kCy = cfg::kScreenH / 2.0f;
@@ -124,8 +150,12 @@ lv_obj_t* s_setTitle = nullptr;
 lv_obj_t* s_setFltLbl = nullptr;
 lv_obj_t* s_setTxtLbl = nullptr;
 lv_obj_t* s_setUnitLbl = nullptr;
+lv_obj_t* s_setTutLbl = nullptr;
 lv_obj_t* s_setWifiLbl = nullptr;
 lv_obj_t* s_setInfoLbl = nullptr;
+lv_obj_t* s_setHint = nullptr;
+lv_obj_t* s_setRows[6] = {nullptr};  // for re-theming card backgrounds
+int s_setRowCount = 0;
 bool s_setOpen = false;
 uint8_t s_briIdx = 3;  // 25/50/75/100%
 uint32_t s_wifiConfirmMs = 0;
@@ -287,8 +317,7 @@ void openAircraftPage() {
   }
   if (!mono[0]) strlcpy(mono, "GA", sizeof(mono));
   lv_label_set_text(s_acMonoLbl, mono);
-  lv_obj_set_style_border_color(
-      s_acMono, lv_color_hex(kPlaneColors[gApp.colComm.load()].hex), 0);
+  lv_obj_set_style_border_color(s_acMono, planeCommColor(), 0);
   lv_obj_clear_flag(s_acMono, LV_OBJ_FLAG_HIDDEN);
 
   lv_label_set_text(s_acInfo, "...");
@@ -611,6 +640,75 @@ void applyTextSize() {
   lv_obj_set_style_text_font(s_acLive, fMed(), 0);
 }
 
+// Load the palette for the current mode and re-style the persistent overlay
+// widgets. The radar face reads the color globals live, so it needs no
+// re-styling; only the created LVGL widgets (which cache their style at set
+// time) must be refreshed. Cheap and rare — runs at init and only when the
+// SWA-only filter is toggled.
+void applyDeviceTheme() {
+#ifdef SWA_THEME
+  loadPalette(swaThemeActive() ? kPalSwa : kPalGreen);
+#else
+  loadPalette(kPalGreen);
+#endif
+  auto txt = [](lv_obj_t* o, lv_color_t c) {
+    if (o) lv_obj_set_style_text_color(o, c, 0);
+  };
+  auto bg = [](lv_obj_t* o, lv_color_t c) {
+    if (o) lv_obj_set_style_bg_color(o, c, 0);
+  };
+  auto brd = [](lv_obj_t* o, lv_color_t c) {
+    if (o) lv_obj_set_style_border_color(o, c, 0);
+  };
+
+  bg(lv_screen_active(), kColBg);
+  txt(s_topLabel, kColText);
+  txt(s_subLabel, kColTextDim);
+  txt(s_rangeLabel, kColText);
+  txt(s_bootLabel, kColSweep);
+
+  bg(s_panel, kColPanelBg);
+  brd(s_panel, kColGridBright);
+  txt(s_panelL1, kColSel);
+  txt(s_panelL2, kColText);
+  txt(s_panelL3, kColTextDim);
+
+  bg(s_acPage, kColBg);
+  txt(s_acTitle, kColSel);
+  txt(s_acRoute, kColText);
+  bg(s_acMono, kColCardBg);
+  brd(s_acMono, planeCommColor());
+  txt(s_acMonoLbl, kColText);
+  bg(s_acDiv1, kColGridBright);
+  bg(s_acDiv2, kColGridBright);
+  txt(s_acSec1, kColAirport);
+  txt(s_acSec2, kColAirport);
+  txt(s_acInfo, kColTextDim);
+  txt(s_acLive, kColText);
+
+  bg(s_setPage, kColBg);
+  txt(s_setTitle, kColText);
+  txt(s_setFltLbl, kColText);
+  txt(s_setTxtLbl, kColText);
+  txt(s_setUnitLbl, kColText);
+  txt(s_setTutLbl, kColText);
+  txt(s_setWifiLbl, kColText);
+  txt(s_setInfoLbl, kColTextDim);
+  txt(s_setHint, kColHint);
+  for (int i = 0; i < s_setRowCount; i++) {
+    bg(s_setRows[i], kColCardBg);
+    brd(s_setRows[i], kColGridBright);
+  }
+
+  bg(s_tutPage, kColBg);
+  txt(s_tutTitle, kColSweep);
+  txt(s_tutBody, kColText);
+  txt(s_tutStep, kColTextDim);
+  bg(s_nearPage, kColBg);
+
+  if (s_radar) lv_obj_invalidate(s_radar);
+}
+
 // ---------- tutorial ----------
 
 void tutorialShowStep() {
@@ -809,12 +907,10 @@ void nearbyDrawCb(lv_event_t* e) {
     } else {
       strlcpy(name, a.callsign[0] ? a.callsign : a.hex, sizeof(name));
     }
-    lv_color_t rowCol =
-        a.isEmergency()
-            ? kColEmerg
-            : (gApp.airlineColors.load() && a.isCommercial())
-                  ? lv_color_hex(kPlaneColors[gApp.colComm.load()].hex)
-                  : lv_color_hex(kPlaneColors[gApp.colPriv.load()].hex);
+    lv_color_t rowCol = a.isEmergency() ? kColEmerg
+                        : (gApp.airlineColors.load() && a.isCommercial())
+                            ? planeCommColor()
+                            : planePrivColor();
     lv_draw_label_dsc_t ld;
     lv_draw_label_dsc_init(&ld);
     ld.text = name;
@@ -1072,8 +1168,8 @@ void radarDrawCb(lv_event_t* e) {
 
     bool isSel = sel == &a;
     bool onGround = a.altFt < 0;
-    lv_color_t privCol = lv_color_hex(kPlaneColors[gApp.colPriv.load()].hex);
-    lv_color_t commCol = lv_color_hex(kPlaneColors[gApp.colComm.load()].hex);
+    lv_color_t privCol = planePrivColor();
+    lv_color_t commCol = planeCommColor();
     lv_color_t col = a.isEmergency() ? kColEmerg
                      : isSel         ? kColSel
                      : onGround      ? kColPlaneGnd
@@ -1280,6 +1376,7 @@ void updateStatusText() {
 }  // namespace
 
 void init() {
+  loadPalette(kPalGreen);  // valid base; corrected by applyDeviceTheme() below
   lv_obj_t* scr = lv_screen_active();
   lv_obj_set_style_bg_color(scr, kColBg, 0);
 
@@ -1469,6 +1566,7 @@ void init() {
     // Bubble press/release to the page so swipes over rows still register.
     lv_obj_add_flag(row, LV_OBJ_FLAG_EVENT_BUBBLE);
     lv_obj_add_event_cb(row, cb, LV_EVENT_CLICKED, nullptr);
+    if (s_setRowCount < 6) s_setRows[s_setRowCount++] = row;
     lv_obj_t* lbl = lv_label_create(row);
     lv_obj_set_style_text_color(lbl, kColText, 0);
     lv_obj_set_style_text_font(lbl, &lv_font_montserrat_16, 0);
@@ -1517,12 +1615,12 @@ void init() {
     refreshSettingsLabels();
   });
   // ----- page 2: help, wifi, device info -----
-  lv_obj_t* tutLbl = makeRow(s_setPg[1], 52, [](lv_event_t*) {
+  s_setTutLbl = makeRow(s_setPg[1], 52, [](lv_event_t*) {
     if (s_swiped) return;
     closeSettings();
     openTutorial();
   });
-  lv_label_set_text(tutLbl, "How to use");
+  lv_label_set_text(s_setTutLbl, "How to use");
   s_setWifiLbl = makeRow(s_setPg[1], 108, [](lv_event_t*) {
     if (s_swiped) return;
     // Two-tap confirm: erasing WiFi credentials forces re-setup.
@@ -1555,11 +1653,11 @@ void init() {
   lv_obj_set_style_text_align(s_setInfoLbl, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_align(s_setInfoLbl, LV_ALIGN_TOP_MID, 0, 178);
 
-  lv_obj_t* setHint = lv_label_create(s_setPage);
-  lv_obj_set_style_text_color(setHint, kColHint, 0);
-  lv_obj_set_style_text_font(setHint, &lv_font_montserrat_10, 0);
-  lv_obj_align(setHint, LV_ALIGN_BOTTOM_MID, 0, -22);
-  lv_label_set_text(setHint, "dial: page 1/2  \xE2\x80\xA2  swipe down: close");
+  s_setHint = lv_label_create(s_setPage);
+  lv_obj_set_style_text_color(s_setHint, kColHint, 0);
+  lv_obj_set_style_text_font(s_setHint, &lv_font_montserrat_10, 0);
+  lv_obj_align(s_setHint, LV_ALIGN_BOTTOM_MID, 0, -22);
+  lv_label_set_text(s_setHint, "dial: page 1/2  \xE2\x80\xA2  swipe down: close");
 
   // ----- nearby list (swipe down from the radar) -----
   s_nearPage = lv_obj_create(scr);
@@ -1626,6 +1724,7 @@ void init() {
       LV_EVENT_RELEASED, nullptr);
 
   loadPrefs();
+  applyDeviceTheme();  // filter now known — pick green vs SWA and restyle
 }
 
 void tick() {
@@ -1655,6 +1754,15 @@ void tick() {
   if (s_lastTextLarge != gApp.textLarge.load()) {
     s_lastTextLarge = gApp.textLarge.load();
     applyTextSize();
+    redraw = true;
+  }
+
+  // SWA-only filter toggled (device row or web) -> swap between the
+  // Southwest brand theme and the standard green radar theme.
+  static bool s_lastSwa = swaThemeActive();  // matches init theme, no spurious pass
+  if (s_lastSwa != swaThemeActive()) {
+    s_lastSwa = swaThemeActive();
+    applyDeviceTheme();
     redraw = true;
   }
 
