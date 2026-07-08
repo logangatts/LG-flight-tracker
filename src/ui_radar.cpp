@@ -144,7 +144,9 @@ char s_acLogoTried[4] = {0};  // late-logo guard: one retry per airline code
 
 // Settings page (swipe up) + nearby list (swipe down)
 lv_obj_t* s_setPage = nullptr;
-lv_obj_t* s_setPg[2] = {nullptr, nullptr};  // settings sub-pages (dial flips)
+constexpr int kSetPageCount = 3;  // 1: planes  2: device  3: info
+lv_obj_t* s_setPg[kSetPageCount] = {nullptr};  // sub-pages (dial cycles them)
+lv_obj_t* s_setDots[kSetPageCount] = {nullptr};  // page indicator
 uint8_t s_setPgIdx = 0;
 lv_obj_t* s_setTitle = nullptr;
 lv_obj_t* s_setFltLbl = nullptr;
@@ -260,6 +262,19 @@ int releaseSwipeDir() {
   int dx = p.x - s_pressPt.x;
   if (abs(dy) < 60 || abs(dy) < abs(dx) * 3 / 2) return 0;
   return dy < 0 ? -1 : 1;
+}
+
+// Horizontal swipe: -1 = left, +1 = right, 0 = none. Used to page through
+// settings (the future touch-only product boards have no dial).
+int releaseSwipeX() {
+  lv_indev_t* indev = lv_indev_active();
+  if (!indev) return 0;
+  lv_point_t p;
+  lv_indev_get_point(indev, &p);
+  int dy = p.y - s_pressPt.y;
+  int dx = p.x - s_pressPt.x;
+  if (abs(dx) < 60 || abs(dx) < abs(dy) * 3 / 2) return 0;
+  return dx < 0 ? -1 : 1;
 }
 
 AircraftSnapshot& snap() {  // lives in PSRAM, allocated on first use
@@ -760,13 +775,22 @@ void tutorialPrev() {
 // ---------- settings page ----------
 
 void showSetPage() {
-  for (int i = 0; i < 2; i++) {
-    if (!s_setPg[i]) continue;
-    if (i == s_setPgIdx) lv_obj_clear_flag(s_setPg[i], LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_add_flag(s_setPg[i], LV_OBJ_FLAG_HIDDEN);
+  for (int i = 0; i < kSetPageCount; i++) {
+    if (s_setPg[i]) {
+      if (i == s_setPgIdx) lv_obj_clear_flag(s_setPg[i], LV_OBJ_FLAG_HIDDEN);
+      else lv_obj_add_flag(s_setPg[i], LV_OBJ_FLAG_HIDDEN);
+    }
+    // Page-indicator dots: active one is bright and larger.
+    if (s_setDots[i]) {
+      bool on = (i == s_setPgIdx);
+      lv_obj_set_style_bg_color(s_setDots[i], on ? kColSweep : kColTextDim, 0);
+      lv_obj_set_style_bg_opa(s_setDots[i], on ? LV_OPA_COVER : LV_OPA_40, 0);
+      lv_obj_set_size(s_setDots[i], on ? 9 : 6, on ? 9 : 6);
+    }
   }
   if (s_setTitle)
-    lv_label_set_text_fmt(s_setTitle, "SETTINGS  %d/2", s_setPgIdx + 1);
+    lv_label_set_text_fmt(s_setTitle, "SETTINGS  %d/%d", s_setPgIdx + 1,
+                          kSetPageCount);
 }
 
 void refreshSettingsLabels() {
@@ -1547,9 +1571,20 @@ void init() {
   lv_obj_set_style_text_color(s_setTitle, kColText, 0);
   lv_obj_set_style_text_font(s_setTitle, &lv_font_montserrat_20, 0);
   lv_obj_align(s_setTitle, LV_ALIGN_TOP_MID, 0, 12);
-  lv_label_set_text(s_setTitle, "SETTINGS  1/2");
+  lv_label_set_text(s_setTitle, "SETTINGS  1/3");
 
-  for (int i = 0; i < 2; i++) {
+  // Page-indicator dots under the title, centered as a row.
+  const int dotGap = 18;
+  const int dotX0 = -(kSetPageCount - 1) * dotGap / 2;
+  for (int i = 0; i < kSetPageCount; i++) {
+    s_setDots[i] = lv_obj_create(s_setPage);
+    lv_obj_remove_style_all(s_setDots[i]);
+    lv_obj_set_size(s_setDots[i], 6, 6);
+    lv_obj_set_style_radius(s_setDots[i], LV_RADIUS_CIRCLE, 0);
+    lv_obj_align(s_setDots[i], LV_ALIGN_TOP_MID, dotX0 + i * dotGap, 40);
+  }
+
+  for (int i = 0; i < kSetPageCount; i++) {
     s_setPg[i] = lv_obj_create(s_setPage);
     lv_obj_remove_style_all(s_setPg[i]);
     lv_obj_set_size(s_setPg[i], cfg::kScreenW, cfg::kScreenH);
@@ -1640,7 +1675,7 @@ void init() {
     }
   });
 
-  // Swipe down anywhere on the settings page closes it.
+  // Swipe down closes; swipe left/right pages through (for touch-only use).
   lv_obj_add_flag(s_setPage, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(s_setPage, pressCb, LV_EVENT_PRESSED, nullptr);
   lv_obj_add_event_cb(
@@ -1649,29 +1684,40 @@ void init() {
         if (releaseSwipeDir() > 0) {
           s_swiped = true;
           closeSettings();
+          return;
+        }
+        int xd = releaseSwipeX();
+        if (xd != 0) {
+          s_swiped = true;
+          int p = (int)s_setPgIdx + (xd < 0 ? 1 : -1);  // swipe left -> next
+          p = (p % kSetPageCount + kSetPageCount) % kSetPageCount;
+          s_setPgIdx = (uint8_t)p;
+          showSetPage();
         }
       },
       LV_EVENT_RELEASED, nullptr);
 
-  s_setInfoLbl = lv_label_create(s_setPg[1]);
+  // ----- page 3: device info + web password -----
+  s_setInfoLbl = lv_label_create(s_setPg[2]);
   lv_obj_set_style_text_color(s_setInfoLbl, kColTextDim, 0);
   lv_obj_set_style_text_font(s_setInfoLbl, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_align(s_setInfoLbl, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_align(s_setInfoLbl, LV_ALIGN_TOP_MID, 0, 158);
+  lv_obj_align(s_setInfoLbl, LV_ALIGN_TOP_MID, 0, 70);
 
   // Web password: given its own big label — it gets read off this screen
   // and typed into a browser, so it's the one thing that must be legible.
-  s_setPassLbl = lv_label_create(s_setPg[1]);
+  s_setPassLbl = lv_label_create(s_setPg[2]);
   lv_obj_set_style_text_color(s_setPassLbl, kColText, 0);
   lv_obj_set_style_text_font(s_setPassLbl, &lv_font_montserrat_24, 0);
   lv_obj_set_style_text_align(s_setPassLbl, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_align(s_setPassLbl, LV_ALIGN_TOP_MID, 0, 246);
+  lv_obj_align(s_setPassLbl, LV_ALIGN_TOP_MID, 0, 200);
 
   s_setHint = lv_label_create(s_setPage);
   lv_obj_set_style_text_color(s_setHint, kColHint, 0);
-  lv_obj_set_style_text_font(s_setHint, &lv_font_montserrat_10, 0);
-  lv_obj_align(s_setHint, LV_ALIGN_BOTTOM_MID, 0, -22);
-  lv_label_set_text(s_setHint, "dial: page 1/2  \xE2\x80\xA2  swipe down: close");
+  lv_obj_set_style_text_font(s_setHint, &lv_font_montserrat_12, 0);
+  lv_obj_align(s_setHint, LV_ALIGN_BOTTOM_MID, 0, -20);
+  lv_label_set_text(s_setHint,
+                    "turn dial for more  \xE2\x80\xA2  swipe down to close");
 
   // ----- nearby list (swipe down from the radar) -----
   s_nearPage = lv_obj_create(scr);
@@ -1791,8 +1837,12 @@ void tick() {
     return;
   }
   if (s_setOpen) {
-    if (hal::encoderTakeSteps() != 0) {
-      s_setPgIdx ^= 1;
+    int steps = hal::encoderTakeSteps();
+    if (steps != 0) {
+      // Cycle the settings pages both directions (wraps around).
+      int p = (int)s_setPgIdx + (steps > 0 ? 1 : -1);
+      p = (p % kSetPageCount + kSetPageCount) % kSetPageCount;
+      s_setPgIdx = (uint8_t)p;
       showSetPage();
     }
     if (hal::encoderTakeClick()) closeSettings();
