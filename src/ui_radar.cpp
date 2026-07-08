@@ -153,6 +153,7 @@ lv_obj_t* s_setUnitLbl = nullptr;
 lv_obj_t* s_setTutLbl = nullptr;
 lv_obj_t* s_setWifiLbl = nullptr;
 lv_obj_t* s_setInfoLbl = nullptr;
+lv_obj_t* s_setPassLbl = nullptr;   // web password, shown large
 lv_obj_t* s_setHint = nullptr;
 lv_obj_t* s_setRows[6] = {nullptr};  // for re-theming card backgrounds
 int s_setRowCount = 0;
@@ -694,6 +695,7 @@ void applyDeviceTheme() {
   txt(s_setTutLbl, kColText);
   txt(s_setWifiLbl, kColText);
   txt(s_setInfoLbl, kColTextDim);
+  txt(s_setPassLbl, kColText);
   txt(s_setHint, kColHint);
   for (int i = 0; i < s_setRowCount; i++) {
     bg(s_setRows[i], kColCardBg);
@@ -797,16 +799,20 @@ void refreshSettingsLabels() {
   } else {
     snprintf(routeLine, sizeof(routeLine), "routes: basic — upgrade on web");
   }
-  char pass[9];
-  devicePassword(pass);
-  char info[208];
+  char info[192];
   snprintf(info, sizeof(info),
-           "v%s  •  %s\nloc: %s  •  %.4f, %.4f\n%s\nweb password: %s",
+           "v%s  •  %s\nloc: %s  •  %.4f, %.4f\n%s\nweb password:",
            cfg::kFwVersion,
            gApp.wifiUp.load() ? WiFi.localIP().toString().c_str() : "offline",
            locSourceName(gApp.locSource.load()), gApp.centerLat.load(),
-           gApp.centerLon.load(), routeLine, pass);
+           gApp.centerLon.load(), routeLine);
   lv_label_set_text(s_setInfoLbl, info);
+
+  // The code itself, large and high-contrast — this is what gets typed into
+  // a browser, so it's the one thing on the page that must be legible.
+  char pass[9];
+  devicePassword(pass);
+  lv_label_set_text(s_setPassLbl, pass);
 }
 
 void openSettings() {
@@ -1539,8 +1545,8 @@ void init() {
 
   s_setTitle = lv_label_create(s_setPage);
   lv_obj_set_style_text_color(s_setTitle, kColText, 0);
-  lv_obj_set_style_text_font(s_setTitle, &lv_font_montserrat_16, 0);
-  lv_obj_align(s_setTitle, LV_ALIGN_TOP_MID, 0, 14);
+  lv_obj_set_style_text_font(s_setTitle, &lv_font_montserrat_20, 0);
+  lv_obj_align(s_setTitle, LV_ALIGN_TOP_MID, 0, 12);
   lv_label_set_text(s_setTitle, "SETTINGS  1/2");
 
   for (int i = 0; i < 2; i++) {
@@ -1569,7 +1575,7 @@ void init() {
     if (s_setRowCount < 6) s_setRows[s_setRowCount++] = row;
     lv_obj_t* lbl = lv_label_create(row);
     lv_obj_set_style_text_color(lbl, kColText, 0);
-    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_20, 0);
     lv_obj_center(lbl);
     return lbl;
   };
@@ -1649,9 +1655,17 @@ void init() {
 
   s_setInfoLbl = lv_label_create(s_setPg[1]);
   lv_obj_set_style_text_color(s_setInfoLbl, kColTextDim, 0);
-  lv_obj_set_style_text_font(s_setInfoLbl, &lv_font_montserrat_10, 0);
+  lv_obj_set_style_text_font(s_setInfoLbl, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_align(s_setInfoLbl, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_align(s_setInfoLbl, LV_ALIGN_TOP_MID, 0, 178);
+  lv_obj_align(s_setInfoLbl, LV_ALIGN_TOP_MID, 0, 158);
+
+  // Web password: given its own big label — it gets read off this screen
+  // and typed into a browser, so it's the one thing that must be legible.
+  s_setPassLbl = lv_label_create(s_setPg[1]);
+  lv_obj_set_style_text_color(s_setPassLbl, kColText, 0);
+  lv_obj_set_style_text_font(s_setPassLbl, &lv_font_montserrat_24, 0);
+  lv_obj_set_style_text_align(s_setPassLbl, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_align(s_setPassLbl, LV_ALIGN_TOP_MID, 0, 246);
 
   s_setHint = lv_label_create(s_setPage);
   lv_obj_set_style_text_color(s_setHint, kColHint, 0);
