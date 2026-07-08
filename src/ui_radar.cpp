@@ -154,8 +154,9 @@ lv_obj_t* s_setTxtLbl = nullptr;
 lv_obj_t* s_setUnitLbl = nullptr;
 lv_obj_t* s_setTutLbl = nullptr;
 lv_obj_t* s_setWifiLbl = nullptr;
-lv_obj_t* s_setInfoLbl = nullptr;
-lv_obj_t* s_setPassLbl = nullptr;   // web password, shown large
+lv_obj_t* s_setInfoLbl = nullptr;   // page 3: how to reach the web page
+lv_obj_t* s_setPassLbl = nullptr;   // page 3: web password, shown large
+lv_obj_t* s_setDevLbl = nullptr;    // page 3: version / IP / loc / routes
 lv_obj_t* s_setHint = nullptr;
 lv_obj_t* s_setRows[6] = {nullptr};  // for re-theming card backgrounds
 int s_setRowCount = 0;
@@ -711,6 +712,7 @@ void applyDeviceTheme() {
   txt(s_setWifiLbl, kColText);
   txt(s_setInfoLbl, kColTextDim);
   txt(s_setPassLbl, kColText);
+  txt(s_setDevLbl, kColHint);
   txt(s_setHint, kColHint);
   for (int i = 0; i < s_setRowCount; i++) {
     bg(s_setRows[i], kColCardBg);
@@ -823,20 +825,26 @@ void refreshSettingsLabels() {
   } else {
     snprintf(routeLine, sizeof(routeLine), "routes: basic — upgrade on web");
   }
-  char info[192];
-  snprintf(info, sizeof(info),
-           "v%s  •  %s\nloc: %s  •  %.4f, %.4f\n%s\nweb password:",
-           cfg::kFwVersion,
-           gApp.wifiUp.load() ? WiFi.localIP().toString().c_str() : "offline",
-           locSourceName(gApp.locSource.load()), gApp.centerLat.load(),
-           gApp.centerLon.load(), routeLine);
-  lv_label_set_text(s_setInfoLbl, info);
+  // Page 3, top: where to log in to the web settings page.
+  lv_label_set_text_fmt(
+      s_setInfoLbl,
+      "Web settings — open on a phone\n(same WiFi):\nhttp://%s.local\n\n"
+      "password:",
+      cfg::kHostname);
 
-  // The code itself, large and high-contrast — this is what gets typed into
-  // a browser, so it's the one thing on the page that must be legible.
+  // The password, large and high-contrast — this is what gets typed into a
+  // browser, so it's the one thing on the page that must be legible.
   char pass[9];
   devicePassword(pass);
   lv_label_set_text(s_setPassLbl, pass);
+
+  // Page 3, bottom: compact device info.
+  lv_label_set_text_fmt(
+      s_setDevLbl, "v%s  •  %s  •  loc %s\n%.3f, %.3f  •  %s",
+      cfg::kFwVersion,
+      gApp.wifiUp.load() ? WiFi.localIP().toString().c_str() : "offline",
+      locSourceName(gApp.locSource.load()), gApp.centerLat.load(),
+      gApp.centerLon.load(), routeLine);
 }
 
 void openSettings() {
@@ -1490,6 +1498,7 @@ void init() {
   lv_obj_set_pos(s_acPage, 0, 0);
   lv_obj_set_style_bg_color(s_acPage, kColBg, 0);
   lv_obj_set_style_bg_opa(s_acPage, LV_OPA_COVER, 0);
+  lv_obj_clear_flag(s_acPage, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_add_flag(s_acPage, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_flag(s_acPage, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_event_cb(
@@ -1565,6 +1574,7 @@ void init() {
   lv_obj_set_pos(s_setPage, 0, 0);
   lv_obj_set_style_bg_color(s_setPage, kColBg, 0);
   lv_obj_set_style_bg_opa(s_setPage, LV_OPA_COVER, 0);
+  lv_obj_clear_flag(s_setPage, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_add_flag(s_setPage, LV_OBJ_FLAG_HIDDEN);
 
   s_setTitle = lv_label_create(s_setPage);
@@ -1573,23 +1583,28 @@ void init() {
   lv_obj_align(s_setTitle, LV_ALIGN_TOP_MID, 0, 12);
   lv_label_set_text(s_setTitle, "SETTINGS  1/3");
 
-  // Page-indicator dots under the title, centered as a row.
-  const int dotGap = 18;
-  const int dotX0 = -(kSetPageCount - 1) * dotGap / 2;
-  for (int i = 0; i < kSetPageCount; i++) {
-    s_setDots[i] = lv_obj_create(s_setPage);
-    lv_obj_remove_style_all(s_setDots[i]);
-    lv_obj_set_size(s_setDots[i], 6, 6);
-    lv_obj_set_style_radius(s_setDots[i], LV_RADIUS_CIRCLE, 0);
-    lv_obj_align(s_setDots[i], LV_ALIGN_TOP_MID, dotX0 + i * dotGap, 40);
-  }
-
+  // Sub-pages first (full-screen, transparent, non-scrolling so swipes don't
+  // leave a stray scrollbar or shift content).
   for (int i = 0; i < kSetPageCount; i++) {
     s_setPg[i] = lv_obj_create(s_setPage);
     lv_obj_remove_style_all(s_setPg[i]);
     lv_obj_set_size(s_setPg[i], cfg::kScreenW, cfg::kScreenH);
     lv_obj_set_pos(s_setPg[i], 0, 0);
+    lv_obj_clear_flag(s_setPg[i], LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(s_setPg[i], LV_OBJ_FLAG_EVENT_BUBBLE);
+  }
+
+  // Page-indicator dots under the title — created last so they sit on top of
+  // the sub-pages and are always visible.
+  const int dotGap = 18;
+  const int dotX0 = -(kSetPageCount - 1) * dotGap / 2;
+  for (int i = 0; i < kSetPageCount; i++) {
+    s_setDots[i] = lv_obj_create(s_setPage);
+    lv_obj_remove_style_all(s_setDots[i]);
+    lv_obj_set_size(s_setDots[i], 8, 8);
+    lv_obj_set_style_radius(s_setDots[i], LV_RADIUS_CIRCLE, 0);
+    lv_obj_clear_flag(s_setDots[i], LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_align(s_setDots[i], LV_ALIGN_TOP_MID, dotX0 + i * dotGap, 40);
   }
 
   auto makeRow = [&](lv_obj_t* pg, int y, lv_event_cb_t cb,
@@ -1702,27 +1717,38 @@ void init() {
       },
       LV_EVENT_RELEASED, nullptr);
 
-  // ----- page 3: device info + web password -----
+  // ----- page 3: web login (where + password) + device info -----
+  // How to reach the settings web page — wraps so a long hostname fits.
   s_setInfoLbl = lv_label_create(s_setPg[2]);
   lv_obj_set_style_text_color(s_setInfoLbl, kColTextDim, 0);
   lv_obj_set_style_text_font(s_setInfoLbl, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_align(s_setInfoLbl, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_align(s_setInfoLbl, LV_ALIGN_TOP_MID, 0, 70);
+  lv_obj_set_width(s_setInfoLbl, 360);
+  lv_label_set_long_mode(s_setInfoLbl, LV_LABEL_LONG_WRAP);
+  lv_obj_align(s_setInfoLbl, LV_ALIGN_TOP_MID, 0, 58);
 
-  // Web password: given its own big label — it gets read off this screen
-  // and typed into a browser, so it's the one thing that must be legible.
+  // The password itself, large and high-contrast — this is what gets typed
+  // into the browser, so it must be legible off the tiny screen.
   s_setPassLbl = lv_label_create(s_setPg[2]);
   lv_obj_set_style_text_color(s_setPassLbl, kColText, 0);
   lv_obj_set_style_text_font(s_setPassLbl, &lv_font_montserrat_24, 0);
   lv_obj_set_style_text_align(s_setPassLbl, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_align(s_setPassLbl, LV_ALIGN_TOP_MID, 0, 200);
+  lv_obj_align(s_setPassLbl, LV_ALIGN_TOP_MID, 0, 170);
+
+  // Compact device info (version / IP / location / route source).
+  s_setDevLbl = lv_label_create(s_setPg[2]);
+  lv_obj_set_style_text_color(s_setDevLbl, kColHint, 0);
+  lv_obj_set_style_text_font(s_setDevLbl, &lv_font_montserrat_10, 0);
+  lv_obj_set_style_text_align(s_setDevLbl, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_width(s_setDevLbl, 320);
+  lv_label_set_long_mode(s_setDevLbl, LV_LABEL_LONG_WRAP);
+  lv_obj_align(s_setDevLbl, LV_ALIGN_TOP_MID, 0, 222);
 
   s_setHint = lv_label_create(s_setPage);
   lv_obj_set_style_text_color(s_setHint, kColHint, 0);
   lv_obj_set_style_text_font(s_setHint, &lv_font_montserrat_12, 0);
-  lv_obj_align(s_setHint, LV_ALIGN_BOTTOM_MID, 0, -20);
-  lv_label_set_text(s_setHint,
-                    "turn dial for more  \xE2\x80\xA2  swipe down to close");
+  lv_obj_align(s_setHint, LV_ALIGN_BOTTOM_MID, 0, -46);
+  lv_label_set_text(s_setHint, "dial / swipe  \xE2\x80\xA2  down: close");
 
   // ----- nearby list (swipe down from the radar) -----
   s_nearPage = lv_obj_create(scr);
@@ -1731,6 +1757,7 @@ void init() {
   lv_obj_set_pos(s_nearPage, 0, 0);
   lv_obj_set_style_bg_color(s_nearPage, kColBg, 0);
   lv_obj_set_style_bg_opa(s_nearPage, LV_OPA_COVER, 0);
+  lv_obj_clear_flag(s_nearPage, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_add_flag(s_nearPage, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_flag(s_nearPage, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_event_cb(s_nearPage, nearbyDrawCb, LV_EVENT_DRAW_MAIN, nullptr);
@@ -1753,6 +1780,7 @@ void init() {
   lv_obj_set_pos(s_tutPage, 0, 0);
   lv_obj_set_style_bg_color(s_tutPage, kColBg, 0);
   lv_obj_set_style_bg_opa(s_tutPage, LV_OPA_COVER, 0);
+  lv_obj_clear_flag(s_tutPage, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_add_flag(s_tutPage, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_flag(s_tutPage, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_event_cb(
